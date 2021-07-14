@@ -1,4 +1,4 @@
-#include "search_server.h"
+//#include "search_server.h"
 
 #include <algorithm>
 #include <cmath>
@@ -8,46 +8,96 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <sstream>
 
 using namespace std;
 
-template <typename A>
-ostream& operator<<(ostream& os, const vector<A>& container){
-    os << '[';
-    size_t i = 0;
-    for(const A& element : container){
-        os << element;
-        if(i + 1 < container.size()){
-            os << ", "s;
+template <typename T, typename U>
+void AssertEqualImpl(const T& t, const U& u, const string& t_str, const string& u_str, const string& file,
+                     const string& func, unsigned line, const string& hint) {
+    if (t != u) {
+        cerr << boolalpha;
+        cerr << file << "("s << line << "): "s << func << ": "s
+             << "ASSERT_EQUAL("s << t_str << ", "s << u_str << ") failed: "s
+             << t << " != "s << u << "."s;
+        if (!hint.empty()) {
+            cerr << " Hint: "s << hint;
         }
-        ++i;
+        cerr << endl;
+        abort();
     }
-    os << ']';
-
-    return os;
 }
 
-template <typename A>
-ostream& operator<<(ostream& os, const set<A>& container){
-    os << '{';
-    size_t i = 0;
-    for(const A& element : container){
-        os << element;
-        if(i + 1 < container.size()){
-            os << ", "s;
-        }
-        ++i;
-    }
-    os << '}';
+#define ASSERT_EQUAL(a, b) AssertEqualImpl((a), (b), #a, #b, __FILE__, __FUNCTION__, __LINE__, ""s)
 
-    return os;
+#define ASSERT_EQUAL_HINT(a, b, hint) AssertEqualImpl((a), (b), #a, #b, __FILE__, __FUNCTION__, __LINE__, (hint))
+
+void AssertImpl(bool value, const string& expr_str, const string& file, const string& func, unsigned line,
+                const string& hint) {
+    if (!value) {
+        cerr << file << "("s << line << "): "s << func << ": "s
+             << "ASSERT("s << expr_str << ") failed."s;
+        if (!hint.empty()) {
+            cerr << " Hint: "s << hint;
+        }
+        cerr << endl;
+        abort();
+    }
 }
 
-template <typename A, typename B>
-ostream& operator<<(ostream& os, const map<A,B>& map){
+#define ASSERT(expr) AssertImpl(!!(expr), #expr, __FILE__, __FUNCTION__, __LINE__, ""s)
+
+#define ASSERT_HINT(expr, hint) AssertImpl(!!(expr), #expr, __FILE__, __FUNCTION__, __LINE__, (hint))
+
+template <typename Func>
+void RunTestImpl(Func func , const string& func_name) {
+    func();
+    cout << func_name << " OK"s << endl;
+}
+
+#define RUN_TEST(func)  RunTestImpl(func, (#func))
+
+template <typename Key, typename Value>
+ostream& operator<<(ostream& out, const pair<Key,Value> element){
+    out << '(' << element.first << ", "s << element.second << ')';
+    return out;
+}
+
+template <typename Elements>
+void Print(ostream& out, const Elements& elements) {
+    bool is_first = true;
+    for(const auto& element : elements){
+        if(is_first){
+            out << element;
+            is_first = false;
+        }
+        else{
+            out << ", "s << element;
+        }
+    }
+}
+
+template <typename Elements>
+ostream& operator<<(ostream& out, const vector<Elements>& elements) {
+    out << '[' ;
+    Print(out, elements);
+    out << ']' ;
+    return out;
+}
+
+template <typename Elements>
+ostream& operator<<(ostream& out, const set<Elements>& elements) {
+    out << '{' ;
+    Print(out, elements);
+    out << '}' ;
+    return out;
+}
+
+template <typename Key, typename Value>
+ostream& operator<<(ostream& os, const map<Key,Value>& map){
     os << '{';
     size_t i = 0;
-    for(const auto[key , value] : map){
+    for(const auto&[key , value] : map){
         os << key  << ": "s << value;
         if(i + 1 < map.size()){
             os << ", "s;
@@ -58,66 +108,32 @@ ostream& operator<<(ostream& os, const map<A,B>& map){
     return os;
 }
 
-template <typename T, typename U>
-void AssertEqualImpl(const T& t, const U& u, const string& t_str, const string& u_str, const string& file,
-                     const string& func, unsigned line, const string& hint) {
-    if (t != u) {
-        cout << boolalpha;
-        cout << file << "("s << line << "): "s << func << ": "s;
-        cout << "ASSERT_EQUAL("s << t_str << ", "s << u_str << ") failed: "s;
-        cout << t << " != "s << u << "."s;
-        if (!hint.empty()) {
-            cout << " Hint: "s << hint;
-        }
-        cout << endl;
-        abort();
-    }
-}
-
-void AssertImpl(bool value, const string& expr_str, const string& file, const string& func, unsigned line,
-                const string& hint) {
-    if (!value) {
-        cout << file << "("s << line << "): "s << func << ": "s;
-        cout << "ASSERT("s << expr_str << ") failed."s;
-        if (!hint.empty()) {
-            cout << " Hint: "s << hint;
-        }
-        cout << endl;
-        abort();
-    }
-}
-
-
-template <typename Func>
-void RunTestImpl(Func func , const string& func_name){
-    func();
-    cerr << func_name << " OK"s << endl;
-}
-
-vector<string> StringToVectorString(const string& line) {
+vector<string> SplitToWords(const string& line) {
     vector<string> output;
+    istringstream iss(line);
     string word;
-    for (const char c : line) {
-        if (c == ' ') {
-            output.push_back(word);
-            word.clear();
-        }
-        else {
-            word += c;
-        }
+
+    while(iss >> word){
+        output.push_back(word);
     }
-    output.push_back(word);
 
     return output;
 }
 
 template <typename A, typename B>
-bool IsVectorsAreSimilar(const vector<A>&  vec_a, const vector<B>& vec_b){
-    for(const A& element_a: vec_a){
-        if(find(vec_b.begin() , vec_b.end(), element_a) == vec_b.end()){
+bool IsVectorsAreSimilar(const vector<A>&  vec_a, vector<B> vec_b){
+    if(vec_a.size() != vec_a.size()){
+        return false;
+    }
+
+    sort(vec_b.begin(), vec_b.end());
+
+    for(const A& element: vec_a){
+        if(!binary_search(vec_b.begin() , vec_b.end(), element)){
             return false;
         }
     }
+
     return true;
 }
 
@@ -199,12 +215,12 @@ void TestMatchDocument(){
         server.AddDocument(doc_id, content, DocumentStatus::ACTUAL, ratings);
         string match_words = "cat in the city"s;
         const auto full_match = server.MatchDocument(match_words , doc_id);
-        ASSERT(IsVectorsAreSimilar(get<0>(full_match),StringToVectorString(content)));
+        ASSERT(IsVectorsAreSimilar(get<0>(full_match), SplitToWords(content)));
 
         //Проверяем матчинг части слов
         match_words = "in the"s;
         const auto part_match = server.MatchDocument(match_words , doc_id);
-        ASSERT(IsVectorsAreSimilar(get<0>(part_match),StringToVectorString(content)));
+        ASSERT(IsVectorsAreSimilar(get<0>(part_match), SplitToWords(content)));
 
 
         //Проверяем минус слова
@@ -285,7 +301,7 @@ void TestComputeRelevance(){
     vector<double> right_result{1.2861458166514987,0.97295507452765662,0.25055259369907362};
     vector<Document> result = server.FindTopDocuments("пушистый кот выразительные глаза"s, DocumentStatus::ACTUAL);
     for(size_t i = 0; i < result.size(); ++i){
-        ASSERT_EQUAL(result[i].relevance, right_result[i]);
+        ASSERT(fabs(result[i].relevance - right_result[i]) < 1e-15);
     }
 
 }
