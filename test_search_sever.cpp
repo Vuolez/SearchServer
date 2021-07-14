@@ -303,7 +303,6 @@ void TestComputeRelevance(){
     for(size_t i = 0; i < result.size(); ++i){
         ASSERT(fabs(result[i].relevance - right_result[i]) < 1e-15);
     }
-
 }
 
 // Функция TestSearchServer является точкой входа для запуска тестов
