@@ -12,6 +12,8 @@
 #include <sstream>
 #include <cerrno>
 
+#include "log_duration.h"
+
 SearchServer::SearchServer(const std::string& stop_words_text)
         : SearchServer(SplitIntoWords(stop_words_text))  // Invoke delegating constructor from std::string container
 {
@@ -37,29 +39,27 @@ void SearchServer::AddDocument(int document_id, const std::string& document, Doc
 
     const double inv_word_count = 1.0 / words.size();
     for (const std::string& word : words) {
-        word_to_document_freqs_[word][document_id] += inv_word_count;
+        word_to_id_freqs_[word][document_id] += inv_word_count;
+        id_to_word_freqs_[document_id][word] += inv_word_count;
     }
 
     documents_.emplace(document_id,DocumentData{ComputeAverageRating(ratings),status});
+    ids_.push_back(document_id);
 }
 
-int SearchServer::GetDocumentId(const int position) const{
-    if(documents_.size() < position || position < 0){
-        throw std::out_of_range("Must satisfy the condition:  0 < 'position' < SearchServer::GetDocumentCount()");
-    }
-
-    size_t i = 0;
-    int result = 0;
-    for(const auto& [id, document] : documents_){
-        if(i == id){
-            result = id;
-            break;
+void SearchServer::RemoveDocument(int document_id){
+    if (id_to_word_freqs_.count(document_id)) {
+        for (const auto& [word, freq] : id_to_word_freqs_.at(document_id)) {
+            word_to_id_freqs_.at(word).erase(document_id);
         }
-        ++i;
+        id_to_word_freqs_.erase(document_id);
+        
+        documents_.erase(document_id);
+        
+        ids_.erase(std::find(ids_.begin(), ids_.end(), document_id));
     }
-
-    return result;
 }
+
 
 void SearchServer::SetStopWords(const std::string& text) {
     for (const std::string& word : SplitIntoWords(text)) {
@@ -82,6 +82,8 @@ unsigned int SearchServer::GetDocumentCount() const {
 }
 
 std::tuple<std::vector<std::string>, DocumentStatus> SearchServer::MatchDocument(const std::string& raw_query, int document_id) const {
+    LOG_DURATION_STREAM("", std::cout);
+    
     if(!IsQueryCorrect(raw_query)){
         throw std::invalid_argument("'raw_query' has one of the following errors:"
                                "1.Search words contain invalid characters with codes from 0 to 31"
@@ -92,18 +94,18 @@ std::tuple<std::vector<std::string>, DocumentStatus> SearchServer::MatchDocument
     const Query query = ParseQuery(raw_query);
     std::vector<std::string> matched_words;
     for (const std::string& word : query.plus_words) {
-        if (word_to_document_freqs_.count(word) == 0) {
+        if (word_to_id_freqs_.count(word) == 0) {
             continue;
         }
-        if (word_to_document_freqs_.at(word).count(document_id)) {
+        if (word_to_id_freqs_.at(word).count(document_id)) {
             matched_words.push_back(word);
         }
     }
     for (const std::string& word : query.minus_words) {
-        if (word_to_document_freqs_.count(word) == 0) {
+        if (word_to_id_freqs_.count(word) == 0) {
             continue;
         }
-        if (word_to_document_freqs_.at(word).count(document_id)) {
+        if (word_to_id_freqs_.at(word).count(document_id)) {
             matched_words.clear();
             break;
         }
@@ -111,6 +113,28 @@ std::tuple<std::vector<std::string>, DocumentStatus> SearchServer::MatchDocument
 
     std::tuple<std::vector<std::string>, DocumentStatus> result = {matched_words, documents_.at(document_id).status};
     return result;
+}
+
+/// Finding frequences for word with document_id in id_to_document_freqs_
+/// @param <document_id> ID of the document for which you want to find frequencies
+/// @return map<word, frequences> if success, empty map (get_word_frequencies_null) otherwise
+static std::map<std::string, double> get_word_frequencies_null;
+const std::map<std::string, double>& SearchServer::GetWordFrequencies(int document_id) const{
+    
+    if (id_to_word_freqs_.count(document_id)) {
+        return id_to_word_freqs_.at(document_id);
+    }
+    else {
+        return get_word_frequencies_null;
+    }
+}
+
+std::vector<int>::const_iterator SearchServer::begin() const{
+    return ids_.begin();
+}
+
+std::vector<int>::const_iterator SearchServer::end() const{
+    return ids_.end();
 }
 
 bool SearchServer::IsStopWord(const std::string& word) const {
@@ -202,5 +226,5 @@ SearchServer::Query SearchServer::ParseQuery(const std::string& text) const {
 
 // Existence required
 double SearchServer::ComputeWordInverseDocumentFreq(const std::string& word) const {
-    return log(GetDocumentCount() * 1.0 / word_to_document_freqs_.at(word).size());
+    return log(GetDocumentCount() * 1.0 / word_to_id_freqs_.at(word).size());
 }

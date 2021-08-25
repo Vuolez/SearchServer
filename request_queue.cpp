@@ -21,29 +21,22 @@ std::vector<Document> RequestQueue::AddFindRequest(const std::string& raw_query)
 
 int RequestQueue::GetNoResultRequests() const {
     size_t qty = 0;
-    for (const auto r : requests_)
-    {
-        if (r.results == 0)
-        {
+    for (const auto r : requests_){
+        if (r.results == 0){
             ++qty;
         }
     }
     return qty;
-    // напишите реализацию
 }
 
-void RequestQueue::CheckResults()
-{
-    if (requests_.size() > sec_in_day_)
-    {
-        while (requests_.size() != sec_in_day_)
-        {
+void RequestQueue::CheckResults(){
+    if (requests_.size() > sec_in_day_){
+        while (requests_.size() != sec_in_day_){
             requests_.pop_front();
         }
     }
 }
-void RequestQueue::AddResult(const std::string& raw_query, size_t query_res)
-{
+void RequestQueue::AddResult(const std::string& raw_query, size_t query_res){
     requests_.push_back({ raw_query,query_res });
     CheckResults();
 }

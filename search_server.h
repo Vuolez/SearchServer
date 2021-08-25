@@ -2,6 +2,7 @@
 
 #include "document.h"
 #include "string_processing.h"
+#include "log_duration.h"
 
 #include <algorithm>
 #include <cmath>
@@ -15,6 +16,7 @@
 #include <cerrno>
 
 const int MAX_RESULT_DOCUMENT_COUNT = 5;
+
 
 class SearchServer {
 public:
@@ -31,13 +33,11 @@ public:
     explicit SearchServer(const std::string& stop_words_text);
 
     void AddDocument(int document_id, const std::string& document, DocumentStatus status, const std::vector<int>& ratings);
-
-    [[nodiscard]] int GetDocumentId(const int position) const;
-
+    void RemoveDocument(int document_id);
     void SetStopWords(const std::string& text);
-
     template <typename DocumentPredicate>
     [[nodiscard]] std::vector<Document> FindTopDocuments(const std::string& raw_query, DocumentPredicate document_predicate) const {
+        LOG_DURATION_STREAM("", std::cout);
         if(!IsQueryCorrect(raw_query)){
             throw std::invalid_argument("'raw_query' has one of the following errors:"
                                    "1.Search words contain invalid characters with codes from 0 to 31"
@@ -70,6 +70,11 @@ public:
 
     [[nodiscard]] std::tuple<std::vector<std::string>, DocumentStatus> MatchDocument(const std::string& raw_query, int document_id) const;
 
+    const std::map<std::string, double>& GetWordFrequencies(int document_id) const;
+
+    [[nodiscard]] std::vector<int>::const_iterator begin() const;
+    [[nodiscard]] std::vector<int>::const_iterator end() const;
+
 private:
     struct DocumentData {
         int rating;
@@ -88,9 +93,10 @@ private:
     };
 
     std::set<std::string> stop_words_;
-    std::map<std::string, std::map<int, double>> word_to_document_freqs_;
+    std::map<std::string, std::map<int, double>> word_to_id_freqs_;
+    std::map<int, std::map<std::string, double>> id_to_word_freqs_;
     std::map<int, DocumentData> documents_;
-
+    std::vector<int> ids_;
 
     [[nodiscard]] bool IsStopWord(const std::string& word) const;
 
@@ -118,11 +124,11 @@ private:
     std::vector<Document> FindAllDocuments(const Query& query, Func func) const {
         std::map<int, double> document_to_relevance;
         for (const std::string& word : query.plus_words) {
-            if (word_to_document_freqs_.count(word) == 0) {
+            if (word_to_id_freqs_.count(word) == 0) {
                 continue;
             }
             const double inverse_document_freq = ComputeWordInverseDocumentFreq(word);
-            for (const auto [document_id, term_freq] : word_to_document_freqs_.at(word)) {
+            for (const auto [document_id, term_freq] : word_to_id_freqs_.at(word)) {
                 const auto [rating, status] = documents_.at(document_id);
                 if (func(document_id,status, rating)) {
                     document_to_relevance[document_id] += term_freq * inverse_document_freq;
@@ -131,10 +137,10 @@ private:
         }
 
         for (const std::string& word : query.minus_words) {
-            if (word_to_document_freqs_.count(word) == 0) {
+            if (word_to_id_freqs_.count(word) == 0) {
                 continue;
             }
-            for (const auto [document_id, _] : word_to_document_freqs_.at(word)) {
+            for (const auto [document_id, _] : word_to_id_freqs_.at(word)) {
                 document_to_relevance.erase(document_id);
             }
         }
