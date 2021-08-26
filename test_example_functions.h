@@ -12,51 +12,49 @@
 #include <vector>
 #include <sstream>
 
-using namespace std;
-
 template <typename T, typename U>
-void AssertEqualImpl(const T& t, const U& u, const string& t_str, const string& u_str, const string& file,
-    const string& func, unsigned line, const string& hint) {
+void AssertEqualImpl(const T& t, const U& u, const std::string& t_str, const std::string& u_str, const std::string& file,
+    const std::string& func, unsigned line, const std::string& hint) {
     if (t != u) {
-        cerr << boolalpha;
-        cerr << file << "("s << line << "): "s << func << ": "s
-            << "ASSERT_EQUAL("s << t_str << ", "s << u_str << ") failed: "s
-            << t << " != "s << u << "."s;
+        std::cerr << std::boolalpha;
+        std::cerr << file << "(" << line << "): " << func << ": "
+            << "ASSERT_EQUAL(" << t_str << ", " << u_str << ") failed: "
+            << t << " != " << u << ".";
         if (!hint.empty()) {
-            cerr << " Hint: "s << hint;
+            std::cerr << " Hint: " << hint;
         }
-        cerr << endl;
+        std::cerr << std::endl;
         abort();
     }
 }
 
-#define ASSERT_EQUAL(a, b) AssertEqualImpl((a), (b), #a, #b, __FILE__, __FUNCTION__, __LINE__, ""s)
+#define ASSERT_EQUAL(a, b) AssertEqualImpl((a), (b), #a, #b, __FILE__, __FUNCTION__, __LINE__, "")
 
 #define ASSERT_EQUAL_HINT(a, b, hint) AssertEqualImpl((a), (b), #a, #b, __FILE__, __FUNCTION__, __LINE__, (hint))
 
-void AssertImpl(bool value, const string& expr_str, const string& file, const string& func, unsigned line,
-    const string& hint);
+void AssertImpl(bool value, const std::string& expr_str, const std::string& file, const std::string& func, unsigned line,
+    const std::string& hint);
 
-#define ASSERT(expr) AssertImpl(!!(expr), #expr, __FILE__, __FUNCTION__, __LINE__, ""s)
+#define ASSERT(expr) AssertImpl(!!(expr), #expr, __FILE__, __FUNCTION__, __LINE__, "")
 
 #define ASSERT_HINT(expr, hint) AssertImpl(!!(expr), #expr, __FILE__, __FUNCTION__, __LINE__, (hint))
 
 template <typename Func>
-void RunTestImpl(Func func, const string& func_name) {
+void RunTestImpl(Func func, const std::string& func_name) {
     func();
-    cout << func_name << " OK"s << endl;
+    std::cout << func_name << " OK" << std::endl;
 }
 
 #define RUN_TEST(func)  RunTestImpl(func, (#func))
 
 template <typename Key, typename Value>
-ostream& operator<<(ostream& out, const pair<Key, Value> element) {
-    out << '(' << element.first << ", "s << element.second << ')';
+std::ostream& operator<<(std::ostream& out, const std::pair<Key, Value> element) {
+    out << '(' << element.first << ", " << element.second << ')';
     return out;
 }
 
 template <typename Elements>
-void Print(ostream& out, const Elements& elements) {
+void Print(std::ostream& out, const Elements& elements) {
     bool is_first = true;
     for (const auto& element : elements) {
         if (is_first) {
@@ -64,13 +62,13 @@ void Print(ostream& out, const Elements& elements) {
             is_first = false;
         }
         else {
-            out << ", "s << element;
+            out << ", " << element;
         }
     }
 }
 
 template <typename Elements>
-ostream& operator<<(ostream& out, const vector<Elements>& elements) {
+std::ostream& operator<<(std::ostream& out, const std::vector<Elements>& elements) {
     out << '[';
     Print(out, elements);
     out << ']';
@@ -78,7 +76,7 @@ ostream& operator<<(ostream& out, const vector<Elements>& elements) {
 }
 
 template <typename Elements>
-ostream& operator<<(ostream& out, const set<Elements>& elements) {
+std::ostream& operator<<(std::ostream& out, const std::set<Elements>& elements) {
     out << '{';
     Print(out, elements);
     out << '}';
@@ -86,13 +84,13 @@ ostream& operator<<(ostream& out, const set<Elements>& elements) {
 }
 
 template <typename Key, typename Value>
-ostream& operator<<(ostream& os, const map<Key, Value>& map) {
+std::ostream& operator<<(std::ostream& os, const std::map<Key, Value>& map) {
     os << '{';
     size_t i = 0;
     for (const auto& [key, value] : map) {
-        os << key << ": "s << value;
+        os << key << ": " << value;
         if (i + 1 < map.size()) {
-            os << ", "s;
+            os << ", ";
         }
         ++i;
     }
@@ -102,7 +100,7 @@ ostream& operator<<(ostream& os, const map<Key, Value>& map) {
 
 
 template <typename A, typename B>
-bool IsVectorsAreSimilar(const vector<A>& vec_a, vector<B> vec_b) {
+bool IsVectorsAreSimilar(const std::vector<A>& vec_a, std::vector<B> vec_b) {
     if (vec_a.size() != vec_a.size()) {
         return false;
     }
@@ -118,9 +116,9 @@ bool IsVectorsAreSimilar(const vector<A>& vec_a, vector<B> vec_b) {
     return true;
 }
 
-vector<string> SplitToWords(const string& line);
+std::vector<std::string> SplitToWords(const std::string& line);
 
-int AverageRating(const vector<int>& ratings);
+int AverageRating(const std::vector<int>& ratings);
 
 SearchServer CreateTestServer();
 
